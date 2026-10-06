@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Mon commerce</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#2B3A8C">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Mon commerce">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);--bg:#F2F4F8;--card:#fff;--ink:#14213D;--mut:#5B6478;--line:#D8DDE8;--ac:#2B3A8C;--on:#fff;--ven:#16794F;--ach:#B8450A;--dng:#B42318}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0E1424;--card:#172038;--ink:#EEF1F8;--mut:#9AA5BD;--line:#2A3556;--ac:#8FA2FF;--on:#0E1424;--ven:#4CC38A;--ach:#F59E5B;--dng:#F97066}}
+:root[data-theme="dark"]{--bg:#0E1424;--card:#172038;--ink:#EEF1F8;--mut:#9AA5BD;--line:#2A3556;--ac:#8FA2FF;--on:#0E1424;--ven:#4CC38A;--ach:#F59E5B;--dng:#F97066}
+*,*:before,*:after{box-sizing:inherit}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:520px;margin:0 auto;padding:16px 14px 96px}
+h1{font-size:20px;margin:0 0 12px}h2{font-size:16px;margin:18px 0 8px}
+label{display:block;font-size:13px;color:var(--mut);margin:10px 0 0;flex:1}
+input,textarea{width:100%;font:inherit;font-size:16px;padding:11px;margin-top:4px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink)}
+.row{display:flex;gap:10px}
+.seg{display:flex;gap:6px;margin-top:10px}
+.seg button{flex:1;padding:13px 4px;font:inherit;font-weight:600;border:2px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink)}
+.seg button.on{border-color:var(--ac);background:var(--ac);color:var(--on)}
+.tot{font-size:22px;font-weight:700;margin:14px 0 0}
+.cta{width:100%;margin-top:16px;padding:15px;font:inherit;font-weight:700;border:0;border-radius:12px;background:var(--ac);color:var(--on)}
+.btn{padding:9px 12px;font:inherit;font-size:14px;font-weight:600;border:1px solid var(--ac);border-radius:9px;background:none;color:var(--ac)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 12px;margin-bottom:8px;display:flex;justify-content:space-between;gap:10px;align-items:center}
+.card small{color:var(--mut);display:block}
+.v{color:var(--ven);font-weight:700}.a{color:var(--ach);font-weight:700}.d{color:var(--dng)}
+.num{text-align:right;white-space:nowrap}
+.x{border:0;background:none;color:var(--dng);font-size:20px;padding:4px 8px}
+table{width:100%;border-collapse:collapse;font-size:14px}td,th{padding:7px 4px;border-bottom:1px solid var(--line);text-align:right}th:first-child,td:first-child{text-align:left}
+nav{position:fixed;left:0;right:0;bottom:0;display:flex;background:var(--card);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px)}
+nav button{flex:1;padding:14px 2px;font:inherit;font-size:14px;font-weight:600;border:0;background:none;color:var(--mut)}
+nav button.on{color:var(--ac);box-shadow:inset 0 3px 0 var(--ac)}
+#toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(76px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;font-size:14px;display:none;max-width:90%}
+.chips{display:grid;grid-template-columns:1fr 1fr;gap:8px}.chip{padding:12px 10px;font:inherit;font-weight:600;border:2px solid var(--ven);border-radius:12px;background:var(--card);color:var(--ink);text-align:left}.chip small{display:block;color:var(--ven);font-weight:700}.hint{color:var(--mut);grid-column:1/-1}
+.empty{color:var(--mut);padding:18px 0;text-align:center}
+</style></head>
+<body>
+<main id="v"></main><div id="toast"></div>
+<nav><button data-t="in">Saisir</button><button data-t="hi">Historique</button><button data-t="de">Dettes</button><button data-t="su">Résumé</button></nav>
+<script>
+const K='commerce.v1';let ops=[];
+try{ops=JSON.parse(localStorage.getItem(K)||'[]')}catch(e){ops=[]}
+const save=()=>{try{localStorage.setItem(K,JSON.stringify(ops))}catch(e){}};
+const $=s=>document.querySelector(s),V=$('#v');
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const fmt=n=>(Math.round(n)||0).toLocaleString('fr-FR')+' F';
+const today=()=>new Date(Date.now()-new Date().getTimezoneOffset()*6e4).toISOString().slice(0,10);
+const dm=d=>d.slice(8,10)+'/'+d.slice(5,7);
+let tab='in',tp='Vente',md='Cash',un='pièce',tt;
+function toast(m,u){const t=$('#toast');t.textContent=m;t.onclick=null;if(u){const b=document.createElement('b');b.textContent=' Annuler';b.style.textDecoration='underline';t.append(b);t.onclick=()=>{u();t.style.display='none'}}t.style.display='block';clearTimeout(tt);tt=setTimeout(()=>t.style.display='none',u?5000:2500)}
+let qk=[],qe=false;try{qk=JSON.parse(localStorage.getItem('commerce.quick')||'[]')}catch(e){}
+const saveQ=()=>{try{localStorage.setItem('commerce.quick',JSON.stringify(qk))}catch(e){}};
+function drawQ(){$('#qk').innerHTML=qk.length?qk.map((q,i)=>`<button class="chip" data-q="${i}">${qe?'× ':''}${esc(q.p)}<small>${fmt(q.pr)}</small></button>`).join(''):'<div class="hint">Aucun raccourci. Remplis le produit et le prix plus bas, puis touche « Ajouter aux raccourcis ».</div>';$('#qe').textContent=qe?'Terminer':'Modifier les raccourcis'}
+const opts=a=>[...new Set(ops.map(o=>o[a]).filter(Boolean))].map(x=>`<option value="${esc(x)}">`).join('');
+function bal(){const m={};ops.forEach(o=>{if(!o.person)return;const b=m[o.person]??={c:0,f:0};
+ if(o.type==='Vente')b.c+=o.total-o.paid;else if(o.type==='Achat')b.f+=o.total-o.paid;
+ else if(o.type==='Règlement client')b.c-=o.paid;else if(o.type==='Règlement fournisseur')b.f-=o.paid});return m}
+function seg(id,vals,cur,fn){const el=$(id);el.innerHTML=vals.map(v=>`<button data-v="${v}" class="${v===cur?'on':''}">${v}</button>`).join('');
+ el.onclick=e=>{const v=e.target.dataset.v;if(v){fn(v);seg(id,vals,v,fn)}}}
+
+const gu=()=>un==='autre'?$('#uo').value.trim():un;
+function rIn(){
+ V.innerHTML=`<h1>Vente rapide</h1><div class="chips" id="qk"></div><button class="btn" id="qe" style="margin-top:8px"></button><h1 style="margin-top:22px">Autre opération</h1><div class="seg" id="tp"></div>
+ <label>Produit<input id="prod" list="pl" autocomplete="off"></label><datalist id="pl">${opts('product')}</datalist>
+ <label>Quantité<input id="qty" type="number" inputmode="decimal" value="1"></label>
+ <div class="seg" id="un"></div><input id="uo" placeholder="Unité (ex : boîte)" hidden>
+ <label>Prix unitaire (FCFA)<input id="price" type="number" inputmode="numeric"></label>
+ <div class="tot" id="tot">Total : 0 F</div><div class="seg" id="md"></div>
+ <label>Personne (client ou fournisseur)<input id="who" list="wl" autocomplete="off"></label><datalist id="wl">${opts('person')}</datalist>
+ <label id="pdw" hidden>Déjà payé (FCFA)<input id="paid" type="number" inputmode="numeric" value="0"></label>
+ <label>Date<input id="dt" type="date" value="${today()}"></label><button class="cta" id="add"></button><button class="btn" id="aq" style="width:100%;margin-top:10px">Ajouter aux raccourcis</button>`;
+ const upd=()=>{$('#tot').textContent='Total : '+fmt(+$('#qty').value*+$('#price').value);$('#pdw').hidden=md!=='Crédit';$('#add').textContent=tp==='Vente'?'Enregistrer la vente':"Enregistrer l'achat"};
+ seg('#tp',['Vente','Achat'],tp,v=>{tp=v;upd()});seg('#md',['Cash','Momo','Crédit'],md,v=>{md=v;upd()});seg('#un',['pièce','paquet','mètre','autre'],un,v=>{un=v;$('#uo').hidden=v!=='autre'});
+ ['#qty','#price'].forEach(s=>$(s).oninput=upd);upd();drawQ();
+ $('#qe').onclick=()=>{qe=!qe;drawQ()};
+ $('#qk').onclick=e=>{const b=e.target.closest('.chip');if(!b)return;const i=+b.dataset.q,q=qk[i];
+  if(qe){qk.splice(i,1);saveQ();drawQ();return}
+  const id=Date.now()+Math.random();ops.push({id,date:today(),type:'Vente',product:q.p,qty:1,unit:q.u,price:q.pr,total:q.pr,mode:'Cash',person:'',paid:q.pr});save();
+  toast(q.p+' vendu : '+fmt(q.pr),()=>{ops=ops.filter(o=>o.id!==id);save();toast('Vente annulée.')})};
+ $('#aq').onclick=()=>{const p=$('#prod').value.trim(),pr=+$('#price').value;if(!p||$('#price').value==='')return toast('Remplis le produit et le prix.');
+  const q={p,pr,u:gu()},k=qk.findIndex(x=>x.p.toLowerCase()===p.toLowerCase());k>=0?qk[k]=q:qk.push(q);saveQ();drawQ();toast('Raccourci ajouté.')};
+ $('#add').onclick=()=>{
+  const q=+$('#qty').value,pr=+$('#price').value,prod=$('#prod').value.trim(),who=$('#who').value.trim();
+  if(!prod||!(q>0)||$('#price').value==='')return toast('Remplis le produit, la quantité et le prix.');
+  if(md==='Crédit'&&!who)return toast('Ajoute le nom de la personne pour un crédit.');
+  const total=q*pr,paid=md==='Crédit'?Math.min(+$('#paid').value||0,total):total;
+  ops.push({id:Date.now()+Math.random(),date:$('#dt').value||today(),type:tp,product:prod,qty:q,unit:gu(),price:pr,total,mode:md,person:who,paid});
+  save();toast(tp==='Vente'?'Vente enregistrée.':'Achat enregistré.');
+  ['#prod','#price','#who','#uo'].forEach(s=>$(s).value='');$('#qty').value=1;$('#paid').value=0;upd();$('#prod').focus()}}
+
+function rHi(){
+ const l=[...ops].sort((a,b)=>b.date.localeCompare(a.date)||b.id-a.id).slice(0,150);
+ V.innerHTML='<h1>Historique</h1>'+(l.length?l.map(o=>{const r=o.type.startsWith('Règl');
+  const c=o.type==='Vente'||o.type==='Règlement client'?'v':'a',rest=o.total-o.paid;
+  return `<div class="card"><div><b class="${c}">${esc(o.type)}</b> · ${esc(o.product)}<small>${dm(o.date)}${r?'':' · '+o.qty+' '+esc(o.unit)+' × '+fmt(o.price)}${o.person?' · '+esc(o.person):''}${r?'':' · '+esc(o.mode)}</small>${!r&&rest>0?`<small class="d">Reste ${fmt(rest)}</small>`:''}</div>
+  <div class="num">${fmt(r?o.paid:o.total)}<button class="x" data-id="${o.id}" aria-label="Supprimer">×</button></div></div>`}).join(''):'<div class="empty">Aucune opération. Va dans Saisir pour ajouter la première.</div>');
+ V.onclick=e=>{const id=e.target.dataset.id;if(id&&confirm('Supprimer cette ligne ?')){ops=ops.filter(o=>String(o.id)!==id);save();rHi()}}}
+
+function rDe(){
+ const b=bal(),L=[];Object.entries(b).forEach(([p,x])=>{if(x.c>0.5)L.push([p,'c',x.c]);if(x.f>0.5)L.push([p,'f',x.f])});
+ V.innerHTML='<h1>Dettes</h1>'+(L.length?L.map(([p,k,a],i)=>`<div class="card"><div><b>${esc(p)}</b><small class="${k==='c'?'v':'a'}">${k==='c'?'Me doit':'Je lui dois'} ${fmt(a)}</small></div><button class="btn" data-i="${i}">${k==='c'?'Encaisser':'Payer'}</button></div>`).join(''):'<div class="empty">Aucune dette en cours.</div>');
+ V.onclick=e=>{const i=e.target.dataset.i;if(i==null)return;const[p,k,a]=L[i];
+  const m=+prompt((k==='c'?'Montant reçu de ':'Montant versé à ')+p+' (max '+Math.round(a)+') :');
+  if(!(m>0))return;ops.push({id:Date.now()+Math.random(),date:today(),type:k==='c'?'Règlement client':'Règlement fournisseur',product:'Règlement',qty:0,unit:'',price:0,total:0,mode:'',person:p,paid:Math.min(m,a)});save();toast('Règlement enregistré.');rDe()}}
+
+function rSu(){
+ const s=t=>ops.filter(o=>o.type===t).reduce((a,o)=>a+o.total,0),b=Object.values(bal());
+ const cr=b.reduce((a,x)=>a+Math.max(0,x.c),0),de=b.reduce((a,x)=>a+Math.max(0,x.f),0),W={};
+ ops.forEach(o=>{if(o.type!=='Vente'&&o.type!=='Achat')return;const d=new Date(o.date+'T00:00:00Z');d.setUTCDate(d.getUTCDate()-(d.getUTCDay()+6)%7);
+  const k=d.toISOString().slice(0,10);(W[k]??={v:0,a:0})[o.type==='Vente'?'v':'a']+=o.total});
+ const ws=Object.keys(W).sort().reverse().slice(0,8);
+ V.innerHTML=`<h1>Résumé</h1>
+ <div class="card"><span>Ventes</span><b class="v">${fmt(s('Vente'))}</b></div><div class="card"><span>Achats</span><b class="a">${fmt(s('Achat'))}</b></div>
+ <div class="card"><span>On me doit</span><b>${fmt(cr)}</b></div><div class="card"><span>Je dois</span><b>${fmt(de)}</b></div>
+ <small style="color:var(--mut)">Ventes − achats n'est pas le bénéfice : le stock non vendu n'est pas compté.</small>
+ <h2>Par semaine</h2>${ws.length?`<table><tr><th>Semaine du</th><th>Ventes</th><th>Achats</th></tr>${ws.map(k=>`<tr><td>${dm(k)}</td><td class="v">${fmt(W[k].v)}</td><td class="a">${fmt(W[k].a)}</td></tr>`).join('')}</table>`:'<div class="empty">Pas encore de données.</div>'}
+ <h2>Sauvegarde</h2><small style="color:var(--mut)">Les données restent sur ce téléphone. Copie une sauvegarde de temps en temps et garde-la dans tes notes ou envoie-la-toi sur WhatsApp.</small>
+ <div class="row" style="margin-top:8px"><button class="btn" id="bj">Sauvegarde</button><button class="btn" id="bc">CSV (Excel)</button><button class="btn" id="bk">Copier</button></div>
+ <textarea id="ta" rows="5" placeholder="Pour restaurer : colle ici une sauvegarde puis touche Restaurer"></textarea><button class="btn" id="br" style="margin-top:8px">Restaurer</button>`;
+ const ta=$('#ta');
+ $('#bj').onclick=()=>ta.value=JSON.stringify(ops);
+ $('#bc').onclick=()=>{const q=x=>'"'+String(x??'').replace(/"/g,'""')+'"';
+  ta.value=['Date;Type;Produit;Qté;Unité;Prix unitaire;Total;Mode;Personne;Payé',...ops.map(o=>[o.date,o.type,o.product,o.qty,o.unit,o.price,o.total,o.mode,o.person,o.paid].map(q).join(';'))].join('\n')};
+ $('#bk').onclick=()=>{if(!ta.value)return toast("Touche d'abord Sauvegarde ou CSV.");ta.select();try{navigator.clipboard.writeText(ta.value).then(()=>toast('Copié.'),()=>{document.execCommand('copy');toast('Copié.')})}catch(e){document.execCommand('copy');toast('Copié.')}};
+ $('#br').onclick=()=>{try{const a=JSON.parse(ta.value);if(!Array.isArray(a))throw 0;if(confirm('Remplacer les données actuelles par cette sauvegarde ?')){ops=a;save();toast('Données restaurées.');rSu()}}catch(e){toast('Sauvegarde invalide.')}};
+ V.onclick=null}
+
+function go(t){tab=t;document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.t===t));V.onclick=null;({in:rIn,hi:rHi,de:rDe,su:rSu})[t]();window.scrollTo(0,0)}
+document.querySelector('nav').onclick=e=>{if(e.target.dataset.t)go(e.target.dataset.t)};
+go('in');
+if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
+</script></body></html>
