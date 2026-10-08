@@ -35,6 +35,8 @@ nav button{flex:1;padding:14px 2px;font:inherit;font-size:14px;font-weight:600;b
 nav button.on{color:var(--ac);box-shadow:inset 0 3px 0 var(--ac)}
 #toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(76px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;font-size:14px;display:none;max-width:90%}
 .chips{display:grid;grid-template-columns:1fr 1fr;gap:8px}.chip{padding:12px 10px;font:inherit;font-weight:600;border:2px solid var(--ven);border-radius:12px;background:var(--card);color:var(--ink);text-align:left}.chip small{display:block;color:var(--ven);font-weight:700}.hint{color:var(--mut);grid-column:1/-1}
+.ban{background:var(--card);border:2px solid var(--ach);border-radius:12px;padding:10px 12px;margin-bottom:14px;display:flex;gap:10px;justify-content:space-between;align-items:center;font-size:14px}
+summary{padding:12px 0;font-weight:600;color:var(--ac)}
 .empty{color:var(--mut);padding:18px 0;text-align:center}
 </style></head>
 <body>
@@ -62,19 +64,78 @@ function seg(id,vals,cur,fn){const el=$(id);el.innerHTML=vals.map(v=>`<button da
  el.onclick=e=>{const v=e.target.dataset.v;if(v){fn(v);seg(id,vals,v,fn)}}}
 
 const gu=()=>un==='autre'?$('#uo').value.trim():un;
+const mondayOf=s=>{const d=new Date(s+'T00:00:00Z');d.setUTCDate(d.getUTCDate()-(d.getUTCDay()+6)%7);return d.toISOString().slice(0,10)};
+const addDays=(s,n)=>{const d=new Date(s+'T00:00:00Z');d.setUTCDate(d.getUTCDate()+n);return d.toISOString().slice(0,10)};
+const dfr=s=>s.slice(8,10)+'/'+s.slice(5,7)+'/'+s.slice(0,4);
+const daysB=(a,b)=>(Date.parse(b+'T00:00:00Z')-Date.parse(a+'T00:00:00Z'))/864e5;
+const getLx=()=>{try{return localStorage.getItem('commerce.lastexp')||''}catch(e){return ''}};
+function bnr(){if(!ops.length)return '';const t=today(),lx=getLx(),old=ops.map(o=>o.date).sort()[0];
+ const sun=new Date(t+'T00:00:00Z').getUTCDay()===0&&lx!==t,late=daysB(lx||old,t)>=8;
+ return sun||late?`<div class="ban"><span>${sun?"C'est dimanche : exporte ta semaine.":"Pas d'export depuis plus d'une semaine."}</span><button class="btn" id="bg">Exporter</button></div>`:''}
+function crc32(b){const t=crc32.t||(crc32.t=Array.from({length:256},(_,n)=>{let c=n;for(let k=0;k<8;k++)c=c&1?0xEDB88320^(c>>>1):c>>>1;return c>>>0}));let r=-1;for(let i=0;i<b.length;i++)r=t[(r^b[i])&255]^(r>>>8);return(r^-1)>>>0}
+function zip(files){const en=new TextEncoder(),parts=[],cd=[];let off=0;
+ for(const[n,s]of files){const nb=en.encode(n),d=en.encode(s),c=crc32(d);
+  const h=new DataView(new ArrayBuffer(30));h.setUint32(0,0x04034b50,true);h.setUint16(4,20,true);h.setUint16(6,0x0800,true);h.setUint16(12,0x21,true);h.setUint32(14,c,true);h.setUint32(18,d.length,true);h.setUint32(22,d.length,true);h.setUint16(26,nb.length,true);
+  parts.push(new Uint8Array(h.buffer),nb,d);
+  const e=new DataView(new ArrayBuffer(46));e.setUint32(0,0x02014b50,true);e.setUint16(4,20,true);e.setUint16(6,20,true);e.setUint16(8,0x0800,true);e.setUint16(14,0x21,true);e.setUint32(16,c,true);e.setUint32(20,d.length,true);e.setUint32(24,d.length,true);e.setUint16(28,nb.length,true);e.setUint32(42,off,true);
+  cd.push(new Uint8Array(e.buffer),nb);off+=30+nb.length+d.length}
+ const cs=cd.reduce((a,x)=>a+x.length,0),t=new DataView(new ArrayBuffer(22));t.setUint32(0,0x06054b50,true);t.setUint16(8,files.length,true);t.setUint16(10,files.length,true);t.setUint32(12,cs,true);t.setUint32(16,off,true);
+ return new Blob([...parts,...cd,new Uint8Array(t.buffer)],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'})}
+function shx(rows,w){return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><cols>'+w.map((x,i)=>`<col min="${i+1}" max="${i+1}" width="${x}" customWidth="1"/>`).join('')+'</cols><sheetData>'+
+ rows.map((r,y)=>`<row r="${y+1}">`+r.map((v,x)=>{const ref=String.fromCharCode(65+x)+(y+1);
+  if(typeof v==='number'&&isFinite(v))return `<c r="${ref}" s="${y?2:1}"><v>${v}</v></c>`;
+  return `<c r="${ref}"${y?'':' s="1"'} t="inlineStr"><is><t>${esc(v)}</t></is></c>`}).join('')+'</row>').join('')+'</sheetData></worksheet>'}
+function buildX(L,per){
+ const sum=t=>L.filter(o=>o.type===t).reduce((a,o)=>a+o.total,0),b=bal(),P=Object.entries(b);
+ const cr=P.reduce((a,[,x])=>a+Math.max(0,x.c),0),de=P.reduce((a,[,x])=>a+Math.max(0,x.f),0);
+ const op=[['Date','Type','Produit','Quantité','Unité','Prix unitaire (F)','Total (F)','Mode','Personne','Payé (F)','Reste à payer (F)'],
+  ...L.map(o=>[dfr(o.date),o.type,o.product,o.qty,o.unit,o.price,o.total,o.mode,o.person,o.paid,(o.type==='Vente'||o.type==='Achat')?o.total-o.paid:0])];
+ const dt=[['Personne','On me doit (F)','Je dois (F)'],...P.filter(([,x])=>x.c>0.5||x.f>0.5).map(([p,x])=>[p,Math.round(Math.max(0,x.c)),Math.round(Math.max(0,x.f))]),['TOTAL',Math.round(cr),Math.round(de)]];
+ const rs=[['Indicateur','Valeur'],['Période',per],['Ventes (F)',sum('Vente')],['Achats (F)',sum('Achat')],['Ventes − achats (F)',sum('Vente')-sum('Achat')],['Clients qui me doivent, à ce jour (F)',Math.round(cr)],['Je dois aux fournisseurs, à ce jour (F)',Math.round(de)],['Exporté le',dfr(today())]];
+ const X='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',N='http://schemas.openxmlformats.org/',M=N+'spreadsheetml/2006/main',R=N+'officeDocument/2006/relationships',PR=N+'package/2006/relationships';
+ const nm=['Opérations','Dettes','Résumé'];
+ return zip([
+  ['[Content_Types].xml',X+`<Types xmlns="${PR.replace('relationships','content-types')}"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>${[1,2,3].map(i=>`<Override PartName="/xl/worksheets/sheet${i}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join('')}<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>`],
+  ['_rels/.rels',X+`<Relationships xmlns="${PR}"><Relationship Id="rId1" Type="${R}/officeDocument" Target="xl/workbook.xml"/></Relationships>`],
+  ['xl/workbook.xml',X+`<workbook xmlns="${M}" xmlns:r="${R}"><sheets>${nm.map((n,i)=>`<sheet name="${n}" sheetId="${i+1}" r:id="rId${i+1}"/>`).join('')}</sheets></workbook>`],
+  ['xl/_rels/workbook.xml.rels',X+`<Relationships xmlns="${PR}">${[1,2,3].map(i=>`<Relationship Id="rId${i}" Type="${R}/worksheet" Target="worksheets/sheet${i}.xml"/>`).join('')}<Relationship Id="rId4" Type="${R}/styles" Target="styles.xml"/></Relationships>`],
+  ['xl/styles.xml',X+`<styleSheet xmlns="${M}"><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts><fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="3"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="3" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`],
+  ['xl/worksheets/sheet1.xml',shx(op,[12,18,24,9,9,16,12,10,22,12,16])],
+  ['xl/worksheets/sheet2.xml',shx(dt,[28,18,18])],
+  ['xl/worksheets/sheet3.xml',shx(rs,[40,26])]])}
+function expo(all){
+ const m=mondayOf(today()),e=addDays(m,6),L=ops.filter(o=>all||(o.date>=m&&o.date<=e)).sort((a,b)=>a.date.localeCompare(b.date));
+ if(!L.length)return toast('Aucune opération sur cette période.');
+ const f=new File([buildX(L,all?'Tout':dfr(m)+' au '+dfr(e))],all?'commerce_tout_'+today()+'.xlsx':'commerce_semaine_'+m+'.xlsx',{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+ try{localStorage.setItem('commerce.lastexp',today())}catch(x){}
+ if(navigator.canShare&&navigator.canShare({files:[f]}))navigator.share({files:[f],title:'Mon commerce'}).catch(()=>{});
+ else{const a=document.createElement('a');a.href=URL.createObjectURL(f);a.download=f.name;document.body.append(a);a.click();a.remove();toast('Fichier enregistré dans tes téléchargements.')}}
+
+function recapTxt(){
+ const m=mondayOf(today()),e=addDays(m,6),L=ops.filter(o=>o.date>=m&&o.date<=e),s=t=>L.filter(o=>o.type===t).reduce((a,o)=>a+o.total,0),B=Object.entries(bal());
+ const dc=B.filter(([,x])=>x.c>0.5).sort((a,b)=>b[1].c-a[1].c),df=B.filter(([,x])=>x.f>0.5).sort((a,b)=>b[1].f-a[1].f);
+ const ls=(a,k)=>a.length?a.map(([p,x])=>'- '+p+' : '+fmt(x[k])).join('\n'):'rien';
+ return 'Récap de la semaine ('+dm(m)+' au '+dm(e)+')\n\nVentes : '+fmt(s('Vente'))+'\nAchats : '+fmt(s('Achat'))+'\n\nOn me doit ('+dc.length+') :\n'+ls(dc,'c')+'\n\nJe dois ('+df.length+') :\n'+ls(df,'f')}
+function markExp(){try{localStorage.setItem('commerce.lastexp',today())}catch(x){}}
+function cpy(t){const a=document.createElement('textarea');a.value=t;document.body.append(a);a.select();let ok=false;try{ok=document.execCommand('copy')}catch(x){}a.remove();toast(ok?'Copié. Colle-le dans WhatsApp ou Notes.':"Impossible de copier.")}
+function shareTxt(t){if(navigator.share)navigator.share({text:t}).then(markExp,()=>{});else cpy(t)}
+function give(f){if(navigator.canShare&&navigator.canShare({files:[f]}))navigator.share({files:[f],title:'Mon commerce'}).then(markExp,()=>{});
+ else{const a=document.createElement('a');a.href=URL.createObjectURL(f);a.download=f.name;document.body.append(a);a.click();a.remove();markExp();toast('Fichier enregistré dans tes téléchargements.')}}
 function rIn(){
- V.innerHTML=`<h1>Vente rapide</h1><div class="chips" id="qk"></div><button class="btn" id="qe" style="margin-top:8px"></button><h1 style="margin-top:22px">Autre opération</h1><div class="seg" id="tp"></div>
+ V.innerHTML=`${bnr()}<h1>Vente rapide</h1><div class="chips" id="qk"></div><button class="btn" id="qe" style="margin-top:8px"></button><h1 style="margin-top:22px">Autre opération</h1><div class="seg" id="tp"></div>
  <label>Produit<input id="prod" list="pl" autocomplete="off"></label><datalist id="pl">${opts('product')}</datalist>
- <label>Quantité<input id="qty" type="number" inputmode="decimal" value="1"></label>
- <div class="seg" id="un"></div><input id="uo" placeholder="Unité (ex : boîte)" hidden>
  <label>Prix unitaire (FCFA)<input id="price" type="number" inputmode="numeric"></label>
  <div class="tot" id="tot">Total : 0 F</div><div class="seg" id="md"></div>
- <label>Personne (client ou fournisseur)<input id="who" list="wl" autocomplete="off"></label><datalist id="wl">${opts('person')}</datalist>
- <label id="pdw" hidden>Déjà payé (FCFA)<input id="paid" type="number" inputmode="numeric" value="0"></label>
- <label>Date<input id="dt" type="date" value="${today()}"></label><button class="cta" id="add"></button><button class="btn" id="aq" style="width:100%;margin-top:10px">Ajouter aux raccourcis</button>`;
- const upd=()=>{$('#tot').textContent='Total : '+fmt(+$('#qty').value*+$('#price').value);$('#pdw').hidden=md!=='Crédit';$('#add').textContent=tp==='Vente'?'Enregistrer la vente':"Enregistrer l'achat"};
+ <div id="cw" hidden><label>Personne (client ou fournisseur)<input id="who" list="wl" autocomplete="off"></label><datalist id="wl">${opts('person')}</datalist>
+ <label id="pdw">Déjà payé (FCFA)<input id="paid" type="number" inputmode="numeric" value="0"></label></div>
+ <details style="margin-top:10px"><summary>Plus d'options (quantité, unité, date)</summary>
+ <label>Quantité<input id="qty" type="number" inputmode="decimal" value="1"></label>
+ <div class="seg" id="un"></div><input id="uo" placeholder="Unité (ex : boîte)" hidden>
+ <label>Date<input id="dt" type="date" value="${today()}"></label></details>
+ <button class="cta" id="add"></button><button class="btn" id="aq" style="width:100%;margin-top:10px">Ajouter aux raccourcis</button>`;
+ const upd=()=>{$('#tot').textContent='Total : '+fmt(+$('#qty').value*+$('#price').value);$('#cw').hidden=md!=='Crédit';$('#add').textContent=tp==='Vente'?'Enregistrer la vente':"Enregistrer l'achat"};
  seg('#tp',['Vente','Achat'],tp,v=>{tp=v;upd()});seg('#md',['Cash','Momo','Crédit'],md,v=>{md=v;upd()});seg('#un',['pièce','paquet','mètre','autre'],un,v=>{un=v;$('#uo').hidden=v!=='autre'});
- ['#qty','#price'].forEach(s=>$(s).oninput=upd);upd();drawQ();
+ ['#qty','#price'].forEach(s=>$(s).oninput=upd);upd();drawQ();const bg=$('#bg');if(bg)bg.onclick=()=>go('su');
  $('#qe').onclick=()=>{qe=!qe;drawQ()};
  $('#qk').onclick=e=>{const b=e.target.closest('.chip');if(!b)return;const i=+b.dataset.q,q=qk[i];
   if(qe){qk.splice(i,1);saveQ();drawQ();return}
@@ -83,8 +144,8 @@ function rIn(){
  $('#aq').onclick=()=>{const p=$('#prod').value.trim(),pr=+$('#price').value;if(!p||$('#price').value==='')return toast('Remplis le produit et le prix.');
   const q={p,pr,u:gu()},k=qk.findIndex(x=>x.p.toLowerCase()===p.toLowerCase());k>=0?qk[k]=q:qk.push(q);saveQ();drawQ();toast('Raccourci ajouté.')};
  $('#add').onclick=()=>{
-  const q=+$('#qty').value,pr=+$('#price').value,prod=$('#prod').value.trim(),who=$('#who').value.trim();
-  if(!prod||!(q>0)||$('#price').value==='')return toast('Remplis le produit, la quantité et le prix.');
+  const q=+$('#qty').value,pr=+$('#price').value,prod=$('#prod').value.trim(),who=md==='Crédit'?$('#who').value.trim():'';
+  if(!prod||!(q>0)||$('#price').value==='')return toast('Remplis le produit et le prix.');
   if(md==='Crédit'&&!who)return toast('Ajoute le nom de la personne pour un crédit.');
   const total=q*pr,paid=md==='Crédit'?Math.min(+$('#paid').value||0,total):total;
   ops.push({id:Date.now()+Math.random(),date:$('#dt').value||today(),type:tp,product:prod,qty:q,unit:gu(),price:pr,total,mode:md,person:who,paid});
@@ -112,20 +173,21 @@ function rSu(){
  ops.forEach(o=>{if(o.type!=='Vente'&&o.type!=='Achat')return;const d=new Date(o.date+'T00:00:00Z');d.setUTCDate(d.getUTCDate()-(d.getUTCDay()+6)%7);
   const k=d.toISOString().slice(0,10);(W[k]??={v:0,a:0})[o.type==='Vente'?'v':'a']+=o.total});
  const ws=Object.keys(W).sort().reverse().slice(0,8);
- V.innerHTML=`<h1>Résumé</h1>
+ V.innerHTML=`<h1>Résumé</h1><button class="cta" id="rc" style="margin:0 0 14px">Envoyer le récap (WhatsApp ou Notes)</button>
  <div class="card"><span>Ventes</span><b class="v">${fmt(s('Vente'))}</b></div><div class="card"><span>Achats</span><b class="a">${fmt(s('Achat'))}</b></div>
  <div class="card"><span>On me doit</span><b>${fmt(cr)}</b></div><div class="card"><span>Je dois</span><b>${fmt(de)}</b></div>
  <small style="color:var(--mut)">Ventes − achats n'est pas le bénéfice : le stock non vendu n'est pas compté.</small>
  <h2>Par semaine</h2>${ws.length?`<table><tr><th>Semaine du</th><th>Ventes</th><th>Achats</th></tr>${ws.map(k=>`<tr><td>${dm(k)}</td><td class="v">${fmt(W[k].v)}</td><td class="a">${fmt(W[k].a)}</td></tr>`).join('')}</table>`:'<div class="empty">Pas encore de données.</div>'}
- <h2>Sauvegarde</h2><small style="color:var(--mut)">Les données restent sur ce téléphone. Copie une sauvegarde de temps en temps et garde-la dans tes notes ou envoie-la-toi sur WhatsApp.</small>
- <div class="row" style="margin-top:8px"><button class="btn" id="bj">Sauvegarde</button><button class="btn" id="bc">CSV (Excel)</button><button class="btn" id="bk">Copier</button></div>
- <textarea id="ta" rows="5" placeholder="Pour restaurer : colle ici une sauvegarde puis touche Restaurer"></textarea><button class="btn" id="br" style="margin-top:8px">Restaurer</button>`;
- const ta=$('#ta');
- $('#bj').onclick=()=>ta.value=JSON.stringify(ops);
- $('#bc').onclick=()=>{const q=x=>'"'+String(x??'').replace(/"/g,'""')+'"';
-  ta.value=['Date;Type;Produit;Qté;Unité;Prix unitaire;Total;Mode;Personne;Payé',...ops.map(o=>[o.date,o.type,o.product,o.qty,o.unit,o.price,o.total,o.mode,o.person,o.paid].map(q).join(';'))].join('\n')};
- $('#bk').onclick=()=>{if(!ta.value)return toast("Touche d'abord Sauvegarde ou CSV.");ta.select();try{navigator.clipboard.writeText(ta.value).then(()=>toast('Copié.'),()=>{document.execCommand('copy');toast('Copié.')})}catch(e){document.execCommand('copy');toast('Copié.')}};
- $('#br').onclick=()=>{try{const a=JSON.parse(ta.value);if(!Array.isArray(a))throw 0;if(confirm('Remplacer les données actuelles par cette sauvegarde ?')){ops=a;save();toast('Données restaurées.');rSu()}}catch(e){toast('Sauvegarde invalide.')}};
+ <h2>Fichiers</h2><small style="color:var(--mut)">Le récap est un simple message à envoyer sur WhatsApp ou à garder dans Notes. L'Excel est plus détaillé : garde-le pour tes archives.</small>
+ <div class="row" style="margin-top:8px"><button class="btn" id="xw">Excel de la semaine</button><button class="btn" id="xa">Excel complet</button></div>
+ <details style="margin-top:14px"><summary>Sauvegarde (avancé)</summary>
+ <small style="color:var(--mut)">Envoie-toi ce fichier sur WhatsApp. Si tu changes de téléphone, tu pourras tout récupérer.</small>
+ <div class="row" style="margin-top:8px"><button class="btn" id="bs">Envoyer ma sauvegarde</button></div>
+ <label>Restaurer depuis un fichier<input id="rf" type="file" accept=".txt,.json"></label></details>`;
+ $('#rc').onclick=()=>shareTxt(recapTxt());
+ $('#xw').onclick=()=>expo(false);$('#xa').onclick=()=>expo(true);
+ $('#bs').onclick=()=>give(new File([JSON.stringify(ops)],'sauvegarde_commerce_'+today()+'.txt',{type:'text/plain'}));
+ $('#rf').onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const a=JSON.parse(r.result);if(!Array.isArray(a))throw 0;if(confirm('Remplacer les données actuelles par cette sauvegarde ?')){ops=a;save();toast('Données restaurées.');rSu()}}catch(x){toast('Fichier invalide.')}};r.readAsText(f)};
  V.onclick=null}
 
 function go(t){tab=t;document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.t===t));V.onclick=null;({in:rIn,hi:rHi,de:rDe,su:rSu})[t]();window.scrollTo(0,0)}
