@@ -152,18 +152,30 @@ function rIn(){
   save();toast(tp==='Vente'?'Vente enregistrée.':'Achat enregistré.');
   ['#prod','#price','#who','#uo'].forEach(s=>$(s).value='');$('#qty').value=1;$('#paid').value=0;upd();$('#prod').focus()}}
 
+function ledger(p,k){const T=k==='c'?['Vente','Règlement client']:['Achat','Règlement fournisseur'];let r=0;
+ return ops.filter(o=>o.person===p&&T.includes(o.type)).sort((a,b)=>a.date.localeCompare(b.date)||a.id-b.id).map(o=>{const s=o.type===T[0];r+=s?o.total-o.paid:-o.paid;return{d:o.date,s,o,r}})}
+function restes(){const m={};[...new Set(ops.filter(o=>o.person).map(o=>o.person))].forEach(p=>['c','f'].forEach(k=>ledger(p,k).forEach(e=>m[e.o.id]=e.r)));return m}
+function relTxt(p,E){return 'Compte de '+p+' au '+dfr(today())+'\n\n'+E.map(e=>dfr(e.d)+' : '+(e.s?e.o.product+(e.o.qty>1?' x'+e.o.qty:'')+' '+fmt(e.o.total)+', payé '+fmt(e.o.paid):'paiement reçu '+fmt(e.o.paid))+', reste '+fmt(e.r)).join('\n')+'\n\nReste à payer : '+fmt(E.length?E[E.length-1].r:0)}
+function rPe(p,k){const E=ledger(p,k),last=E.length?E[E.length-1].r:0,c=k==='c';
+ V.innerHTML=`<button class="btn" id="bk2">← Retour</button><h1 style="margin-top:12px">${esc(p)}</h1><div class="tot ${c?'v':'a'}">${c?'Me doit':'Je lui dois'} ${fmt(last)}</div>`+
+ E.map(e=>`<div class="card"><div><b>${dfr(e.d)}</b><br>${e.s?esc(e.o.product)+(e.o.qty>1?' × '+e.o.qty:''):(c?'Paiement reçu':'Paiement versé')}<small>${e.s?'Total '+fmt(e.o.total)+' · payé '+fmt(e.o.paid):fmt(e.o.paid)}</small></div><div class="num"><small>Reste</small><b class="${e.r>0.5?'d':'v'}">${fmt(e.r)}</b></div></div>`).join('')+
+ (last>0.5?`<button class="cta" id="en">${c?'Encaisser un paiement':'Payer un montant'}</button>`:'')+(c&&E.length?'<button class="btn" id="sr" style="width:100%;margin-top:10px">Envoyer le relevé (WhatsApp)</button>':'');
+ $('#bk2').onclick=()=>go('de');
+ const en=$('#en');if(en)en.onclick=()=>{const m=+prompt((c?'Montant reçu de ':'Montant versé à ')+p+' (max '+Math.round(last)+') :');if(!(m>0))return;
+  ops.push({id:Date.now()+Math.random(),date:today(),type:c?'Règlement client':'Règlement fournisseur',product:'Règlement',qty:0,unit:'',price:0,total:0,mode:'',person:p,paid:Math.min(m,last)});save();toast('Paiement enregistré.');rPe(p,k)};
+ const sr=$('#sr');if(sr)sr.onclick=()=>shareTxt(relTxt(p,E));V.onclick=null;window.scrollTo(0,0)}
 function rHi(){
- const l=[...ops].sort((a,b)=>b.date.localeCompare(a.date)||b.id-a.id).slice(0,150);
+ const R=restes(),l=[...ops].sort((a,b)=>b.date.localeCompare(a.date)||b.id-a.id).slice(0,150);
  V.innerHTML='<h1>Historique</h1>'+(l.length?l.map(o=>{const r=o.type.startsWith('Règl');
   const c=o.type==='Vente'||o.type==='Règlement client'?'v':'a',rest=o.total-o.paid;
-  return `<div class="card"><div><b class="${c}">${esc(o.type)}</b> · ${esc(o.product)}<small>${dm(o.date)}${r?'':' · '+o.qty+' '+esc(o.unit)+' × '+fmt(o.price)}${o.person?' · '+esc(o.person):''}${r?'':' · '+esc(o.mode)}</small>${!r&&rest>0?`<small class="d">Reste ${fmt(rest)}</small>`:''}</div>
+  return `<div class="card"><div><b class="${c}">${esc(o.type)}</b> · ${esc(o.product)}<small>${dm(o.date)}${r?'':' · '+o.qty+' '+esc(o.unit)+' × '+fmt(o.price)}${o.person?' · '+esc(o.person):''}${r?'':' · '+esc(o.mode)}</small>${!r&&rest>0?`<small class="d">Payé ${fmt(o.paid)} · reste ${fmt(rest)}</small>`:''}${r?`<small class="d">Reste après ce paiement : ${fmt(R[o.id]||0)}</small>`:''}${o.person&&(r||o.mode==='Crédit')?`<small class="v" data-p="${esc(o.person)}" data-k="${o.type==='Vente'||o.type==='Règlement client'?'c':'f'}">Voir le compte ›</small>`:''}</div>
   <div class="num">${fmt(r?o.paid:o.total)}<button class="x" data-id="${o.id}" aria-label="Supprimer">×</button></div></div>`}).join(''):'<div class="empty">Aucune opération. Va dans Saisir pour ajouter la première.</div>');
- V.onclick=e=>{const id=e.target.dataset.id;if(id&&confirm('Supprimer cette ligne ?')){ops=ops.filter(o=>String(o.id)!==id);save();rHi()}}}
+ V.onclick=e=>{const q=e.target.closest('[data-p]');if(q)return rPe(q.dataset.p,q.dataset.k);const id=e.target.dataset.id;if(id&&confirm('Supprimer cette ligne ?')){ops=ops.filter(o=>String(o.id)!==id);save();rHi()}}}
 
 function rDe(){
  const b=bal(),L=[];Object.entries(b).forEach(([p,x])=>{if(x.c>0.5)L.push([p,'c',x.c]);if(x.f>0.5)L.push([p,'f',x.f])});
- V.innerHTML='<h1>Dettes</h1>'+(L.length?L.map(([p,k,a],i)=>`<div class="card"><div><b>${esc(p)}</b><small class="${k==='c'?'v':'a'}">${k==='c'?'Me doit':'Je lui dois'} ${fmt(a)}</small></div><button class="btn" data-i="${i}">${k==='c'?'Encaisser':'Payer'}</button></div>`).join(''):'<div class="empty">Aucune dette en cours.</div>');
- V.onclick=e=>{const i=e.target.dataset.i;if(i==null)return;const[p,k,a]=L[i];
+ V.innerHTML='<h1>Dettes</h1>'+(L.length?L.map(([p,k,a],i)=>`<div class="card"><div><b>${esc(p)}</b><small class="${k==='c'?'v':'a'}">${k==='c'?'Me doit':'Je lui dois'} ${fmt(a)}</small></div><div style="display:flex;flex-direction:column;gap:6px"><button class="btn" data-d="${i}">Détail</button><button class="btn" data-i="${i}">${k==='c'?'Encaisser':'Payer'}</button></div></div>`).join(''):'<div class="empty">Aucune dette en cours.</div>');
+ V.onclick=e=>{const dd=e.target.dataset.d;if(dd!=null)return rPe(L[dd][0],L[dd][1]);const i=e.target.dataset.i;if(i==null)return;const[p,k,a]=L[i];
   const m=+prompt((k==='c'?'Montant reçu de ':'Montant versé à ')+p+' (max '+Math.round(a)+') :');
   if(!(m>0))return;ops.push({id:Date.now()+Math.random(),date:today(),type:k==='c'?'Règlement client':'Règlement fournisseur',product:'Règlement',qty:0,unit:'',price:0,total:0,mode:'',person:p,paid:Math.min(m,a)});save();toast('Règlement enregistré.');rDe()}}
 
